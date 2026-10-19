@@ -1,0 +1,15 @@
+# Docker's embedded DNS. With `resolve`, nginx re-resolves container IPs,
+# so restarting a backend doesn't require restarting the gateway.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+upstream users_svc {
+    zone users_svc 64k;
+    server users:80 resolve;
+    keepalive 16;
+}
+
+upstream orders_svc {
+    zone orders_svc 64k;
+    server orders:80 resolve;
+    keepalive 16;
+}

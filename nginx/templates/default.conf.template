@@ -1,0 +1,55 @@
+# Named default.conf.template so it replaces the image's stock default.conf.
+
+# --- HTTP: health check + redirect to HTTPS ---
+server {
+    listen 80 default_server;
+    server_name _;
+
+    location = /healthz {
+        access_log off;
+        return 200 '{"status":"ok"}';
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# --- HTTPS: the actual gateway ---
+server {
+    listen 443 ssl default_server;
+    http2 on;
+    server_name ${API_DOMAIN};
+
+    # Cloudflare Origin cert or Let's Encrypt (DNS-01) cert
+    ssl_certificate     /etc/nginx/certs/fullchain.pem;
+    ssl_certificate_key /etc/nginx/certs/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+
+    include snippets/cloudflare-realip.conf;
+
+    add_header X-Request-ID $request_id always;
+
+    # Trailing slash on proxy_pass strips the prefix:
+    # /api/users/42  ->  users:80/42
+    location /api/users/ {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://users_svc/;
+        include snippets/proxy.conf;
+    }
+
+    location /api/orders/ {
+        limit_req zone=api burst=20 nodelay;
+        proxy_pass http://orders_svc/;
+        include snippets/proxy.conf;
+    }
+
+    location = /healthz {
+        access_log off;
+        return 200 '{"status":"ok"}';
+    }
+
+    location / {
+        return 404 '{"error":"not found"}';
+    }
+}

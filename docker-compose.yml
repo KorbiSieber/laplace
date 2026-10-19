@@ -1,0 +1,40 @@
+services:
+  gateway:
+    image: nginx:1.28-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/templates:/etc/nginx/templates:ro   # rendered into /etc/nginx/conf.d via envsubst
+      - ./nginx/snippets:/etc/nginx/snippets:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    networks: [edge, backend]
+    depends_on: [users, orders]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # --- Backend services: no published ports, only reachable through the gateway ---
+  users:
+    image: traefik/whoami          # placeholder - replace with your service
+    networks: [backend]
+    restart: unless-stopped
+
+  orders:
+    image: traefik/whoami          # placeholder - replace with your service
+    networks: [backend]
+    restart: unless-stopped
+
+networks:
+  edge: {
+    internal: true
+  }
+  backend: {
+    internal: true
+  }   # add `internal: true` if backends never need outbound internet
